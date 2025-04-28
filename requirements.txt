@@ -11,3 +11,4 @@ python-multipart
 cloudinary
 firebase_admin
 firebase
+email-validator
