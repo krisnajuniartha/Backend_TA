@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-jose
+passlib
+pyjwt
+typing
+datetime
+pymongo
+motor
+python-multipart
+cloudinary
+firebase_admin
+firebase
