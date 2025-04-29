@@ -1001,3 +1001,7 @@ async def delete_virtual_tour_data_endpoint(id: str, current_user: UserInDB = De
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run("main:app", host="0.0.0.0", port=port)
+
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)

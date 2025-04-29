@@ -10,6 +10,8 @@ from cloudinary.utils import cloudinary_url
 import time
 from datetime import datetime
 import re
+import logging
+
 
 
 
