@@ -61,11 +61,11 @@ async def get_status():
 
 async def get_user(email: str):
 
-    try:
-        # Validasi email menggunakan email-validator
-        valid = validate_email(email)
-    except EmailNotValidError as e:
-        raise ValueError(f"Email tidak valid: {str(e)}")
+    # try:
+    #     # Validasi email menggunakan email-validator
+    #     valid = validate_email(email)
+    # except EmailNotValidError as e:
+    #     raise ValueError(f"Email tidak valid: {str(e)}")
 
     local_part, domain = email.split('@')
 
