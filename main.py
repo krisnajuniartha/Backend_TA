@@ -1,16 +1,15 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile, status, Depends, Header, Form, Body
+from fastapi import FastAPI, HTTPException, File, UploadFile, status, Depends, Header, Form
 from fastapi.middleware.cors import CORSMiddleware
 from models.pengguna import *
-
 import os
 import jwt
 from datetime import timedelta, datetime, timezone
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from jose import jwt,JWTError
+from jwt.exceptions import InvalidTokenError, ExpiredSignatureError, PyJWTError
+from jose import jwt, JWTError
 from passlib.context import CryptContext
 import re
-from typing import Annotated, List, Optional, Union
-# from jwt.exceptions import InvalidTokenError, ExpiredSignatureError, PyJWTError
+from typing import Annotated, List, Optional
 import json
 import cloudinary
 import cloudinary.uploader
