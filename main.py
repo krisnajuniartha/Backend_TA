@@ -182,7 +182,7 @@ async def login_for_access_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect Email or Password",
-            headers={"WWW-Authenticate": "Barrier"},
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     access_token_expire = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -199,6 +199,7 @@ async def login_for_access_token(
             "updatedAtTime": str(user.updatedAtTime),
             "updatedAtDate": str(user.updatedAtDate),
             "role": str(user.role)
+
         },
         expirate_delta=access_token_expire
     )
