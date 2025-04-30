@@ -15,7 +15,7 @@ import logging
 
 
 
-uri = "mongodb+srv://krisnajuniartha:ffx9GWKjBMaQAuMm@tugas-akhir-database.ekayh.mongodb.net/?retryWrites=true&w=majority&appName=tugas-akhir-database"
+uri = "mongodb://krisnajuniartha:ffx9GWKjBMaQAuMm@tugas-akhir-database-shard-00-00.ekayh.mongodb.net:27017,tugas-akhir-database-shard-00-01.ekayh.mongodb.net:27017,tugas-akhir-database-shard-00-02.ekayh.mongodb.net:27017/?ssl=true&replicaSet=atlas-tz4cwh-shard-0&authSource=admin&retryWrites=true&w=majority&appName=tugas-akhir-database"
 
 client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=100000)
 database = client["tugas_akhir_krisna"]
@@ -27,7 +27,7 @@ collection_status =database["status"]
 
 try:
     client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
+    print("Pinged your deployment. penggunadatabase successfully connected to MongoDB!")
 except Exception as e:
     print(e)
 
