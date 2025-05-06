@@ -37,6 +37,7 @@ from databases.penggunadatabase import (
     fetch_pengguna_by_filter,
     get_role,
     approval_users_data,
+    get_status
 )
 
 from databases.purabesakihdatabase import (
@@ -375,6 +376,13 @@ async def get_role_list_data():
     if response:
         return response
     raise HTTPException(404, f"There is no data role!")
+
+@app.get("/api/getallstatus/liststatus")
+async def get_status_list_data():
+    response = await get_status()
+    if response:
+        return response
+    raise HTTPException(404, f"There is no data status!")
 
 @app.put("/api/userdata/approval/{id}")
 async def update_data_approval_users(id: str, status: Annotated[str, Form()], current_user: UserInDB = Depends(get_current_user)):
