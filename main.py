@@ -812,13 +812,13 @@ async def filter_pura_by_status(
         raise HTTPException(404, "Data tidak ditemukan untuk filter yang diberikan")
 
 # Endpoint to search pura by name
-@app.get("/api/pura-besakih/search")
+@app.get("/api/pura-besakih/search/{nama_pura}")
 async def search_pura(
-    nama: str,
+    nama_pura: str,
     current_user: UserInDB = Depends(get_current_user)
 ):
     if current_user:
-        response = await fetch_pura_by_nama(nama)
+        response = await fetch_pura_by_nama(nama_pura)
         return response
 
 # Endpoint to filter pura by golongan

@@ -552,11 +552,11 @@ async def fetch_pura_by_filter_status(status: list[str]):
         return {"error": str(e)}
 
 # Function to search pura by nama
-async def fetch_pura_by_nama(nama: str):
+async def fetch_pura_by_nama(nama_pura: str):
     pura_list = []
     
     try:
-        cursor = collection_pura.find({"nama_pura": {"$regex": f"(?i){nama}"}})
+        cursor = collection_pura.find({"nama_pura": {"$regex": f"(?i){nama_pura}"}})
         
         async for document in cursor:
             # Process timestamps
