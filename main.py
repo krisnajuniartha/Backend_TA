@@ -92,7 +92,7 @@ from databases.virtualtourdatabase import (
 
 SECRET_KEY = "inikrisna"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 10
+ACCESS_TOKEN_EXPIRE_MINUTES = 10000
 
 #API object
 app = FastAPI()
