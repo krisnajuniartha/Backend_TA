@@ -87,7 +87,8 @@ from databases.virtualtourdatabase import (
     update_virtual_tour_thumbnail,
     delete_virtual_tour_data,
     fetch_virtual_tour_by_pura_id,
-    fetch_virtual_tour_by_name
+    fetch_virtual_tour_by_name,
+    delete_virtual_tour_by_pura_id
 )
 
 SECRET_KEY = "inikrisna"
@@ -1005,6 +1006,24 @@ async def delete_virtual_tour_data_endpoint(id: str, current_user: UserInDB = De
     if success:
         return {"message": f"Virtual tour dengan ID {id} berhasil dihapus"}
     raise HTTPException(500, f"Gagal menghapus virtual tour dengan ID {id}")
+
+@app.delete("/api/virtualtourdata/deletebypura/{pura_id}")
+async def delete_virtual_tour_by_pura_endpoint(pura_id: str, current_user: UserInDB = Depends(get_current_user)):
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tidak terautentikasi")
+    
+    # Periksa apakah pura dengan ID tersebut ada dan ada virtual tour yang terkait
+    response = await fetch_virtual_tour_by_pura_id(pura_id)
+    if not response.get("data_virtual_tour") or len(response.get("data_virtual_tour")) == 0:
+        raise HTTPException(404, f"Tidak ada virtual tour yang terkait dengan pura ID {pura_id}")
+    
+    success, deleted_count = await delete_virtual_tour_by_pura_id(pura_id)
+    if success:
+        return {"message": f"{deleted_count} virtual tour untuk pura dengan ID {pura_id} berhasil dihapus"}
+    
+    raise HTTPException(500, f"Gagal menghapus virtual tour untuk pura dengan ID {pura_id}")
+
+
 
 
 # if __name__ == "__main__":

@@ -343,6 +343,48 @@ async def fetch_virtual_tour_by_pura_id(pura_id: str):
     except Exception as e:
         print(f"Error fetching virtual tour by pura_id: {e}")
         return {"error": str(e)}
+    
+async def delete_virtual_tour_by_pura_id(pura_id: str):
+    """
+    Menghapus semua virtual tour berdasarkan pura_id termasuk file di cloudinary
+    """
+    try:
+        # Ambil semua virtual tour untuk pura tersebut
+        response = await fetch_virtual_tour_by_pura_id(pura_id)
+        virtual_tours = response.get("data_virtual_tour", [])
+        
+        # Hapus semua file dari cloudinary
+        for tour in virtual_tours:
+            # Hapus panorama
+            if tour.get("panorama_url") and tour.get("panorama_url") != "none":
+                panorama_url = tour.get("panorama_url")
+                public_id = extract_public_id(panorama_url)
+                if public_id:
+                    try:
+                        # Hapus panorama dari cloudinary
+                        cloudinary.uploader.destroy(public_id)
+                    except Exception as e:
+                        print(f"Error deleting panorama from cloudinary: {e}")
+            
+            # Hapus thumbnail
+            if tour.get("thumbnail_url") and tour.get("thumbnail_url") != "none":
+                thumbnail_url = tour.get("thumbnail_url")
+                public_id = extract_public_id(thumbnail_url)
+                if public_id:
+                    try:
+                        # Hapus thumbnail dari cloudinary
+                        cloudinary.uploader.destroy(public_id)
+                    except Exception as e:
+                        print(f"Error deleting thumbnail from cloudinary: {e}")
+        
+        # Hapus semua virtual tour dari database
+        result = await collection_virtual_tour.delete_many({"pura_id": pura_id})
+        
+        return True, result.deleted_count
+    
+    except Exception as e:
+        print(f"Error deleting virtual tours by pura_id: {e}")
+        return False, 0
 
 async def fetch_virtual_tour_by_name(name: str):
     virtual_tour_list = []
