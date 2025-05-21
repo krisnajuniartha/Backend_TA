@@ -75,7 +75,8 @@ async def fetch_one_pura(id: str):
         document = await collection_pura.find_one({"_id": object_id})
         
         if not document:
-            return None
+            # Mengembalikan list kosong dalam wrapper jika tidak ada dokumen
+            return {"data_pura": []}
         
         # Process timestamps
         ts = document.get("createdAt")
@@ -107,10 +108,10 @@ async def fetch_one_pura(id: str):
                             "description": hariraya_doc.get("description", "")
                         })
                 except Exception as e:
-                    print(f"Error fetching hariraya info: {e}")
+                    print(f"Error fetching hariraya info for ID {hariraya_id}: {e}") # Tambahkan ID untuk debugging
         
         # Get status information
-        status_info = None
+        status_info = None # Mengganti nama variabel agar lebih jelas
         if "status_id" in document:
             try:
                 status_doc = await collection_status.find_one({"_id": ObjectId(document["status_id"])})
@@ -120,19 +121,36 @@ async def fetch_one_pura(id: str):
                         "status": status_doc.get("status", "")
                     }
             except Exception as e:
-                print(f"Error fetching status info: {e}")
+                print(f"Error fetching status info for ID {document['status_id']}: {e}") # Tambahkan ID untuk debugging
         
+        # Get golongan information (as seen in your PuraBesakihDataItem)
+        golongan_info = None
+        if "golongan_id" in document:
+            try:
+                # Assuming you have a 'collection_golongan' similar to 'collection_status'
+                # and 'golongan' is a field in that document.
+                # If not, you might need to adjust this part or fetch it differently.
+                golongan_doc = await collection_golongan.find_one({"_id": ObjectId(document["golongan_id"])})
+                if golongan_doc:
+                    golongan_info = {
+                        "_id": str(golongan_doc["_id"]),
+                        "golongan": golongan_doc.get("golongan", "") # Assuming field name is 'golongan'
+                    }
+            except Exception as e:
+                print(f"Error fetching golongan info for ID {document['golongan_id']}: {e}")
+
         pura_data = {
             "_id": str(document["_id"]),
             "nama_pura": document.get("nama_pura", ""),
             "description": document.get("description", ""),
             "audio_description": document.get("audio_description", ""),
             "image_pura": document.get("image_pura", ""),
-            "status_id": document.get("status_id", ""),
-            "status_info": status_info,
-            "hariraya_id": document.get("hariraya_id", []),
-            "hariraya_info": hariraya_info,
-            "golongan_id": document.get("golongan_id", ""),
+            "hariraya_id": [str(hid) for hid in document.get("hariraya_id", [])], # Pastikan ini list of strings
+            "hariraya_info": hariraya_info, # Ini akan menjadi list of objects
+            "status_id": document.get("status_id", ""), # Ini tetap string ID
+            "status": status_info.get("status") if status_info else None, # Mengambil nama status langsung
+            "golongan_id": document.get("golongan_id", ""), # Ini tetap string ID
+            "golongan": golongan_info.get("golongan") if golongan_info else None, # Mengambil nama golongan langsung
             "createdAt": dt,
             "createdDate": str(tanggal),
             "createdTime": str(waktu),
@@ -141,10 +159,12 @@ async def fetch_one_pura(id: str):
             "updateTime": str(updateWaktu)
         }
 
-        return pura_data
+        # Membungkus data tunggal dalam sebuah list dan kemudian dalam dictionary "data_pura"
+        return {"data_pura": [pura_data]}
     except Exception as e:
         print(f"Error fetching pura: {e}")
-        return None
+        # Mengembalikan list kosong dalam wrapper jika terjadi error
+        return {"data_pura": [], "error": str(e)}
 
 async def fetch_all_pura():
     pura_list = []
