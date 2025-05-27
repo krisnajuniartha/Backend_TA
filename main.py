@@ -49,7 +49,8 @@ from databases.purabesakihdatabase import (
     approval_pura_data,
     fetch_pura_by_filter_status,
     fetch_pura_by_nama,
-    fetch_pura_by_golongan
+    fetch_pura_by_golongan,
+    get_golongan
 )
 
 from databases.beritapuradatabase import (
@@ -633,6 +634,14 @@ async def get_hariraya_by_date(
 
 
 # Pura Besakih Endpoint
+
+# Endpoint to get all golongan
+@app.get("/api/golongan")
+async def get_all_golongan(current_user: UserInDB = Depends(get_current_user)):
+    if current_user:
+        # Panggil fungsi yang sudah ada untuk mengambil data golongan dari database
+        response = await get_golongan()
+        return response
 
 @app.get("/api/pura-besakih")
 async def get_all_pura(current_user: UserInDB = Depends(get_current_user)):
