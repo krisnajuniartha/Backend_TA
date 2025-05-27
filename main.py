@@ -45,8 +45,6 @@ from databases.purabesakihdatabase import (
     fetch_one_pura,
     create_pura_data,
     update_pura_data,
-    update_pura_image,
-    update_pura_audio,
     delete_pura_data,
     approval_pura_data,
     fetch_pura_by_filter_status,
@@ -708,75 +706,32 @@ async def create_pura(
 @app.put("/api/pura-besakih/update/{id}")
 async def update_pura(
     id: str,
-    nama_pura: Annotated[str, Form()] = None,
-    description: Annotated[str, Form()] = None,
-    hariraya_id: Annotated[List[str], Form()] = None,
-    golongan_id: Annotated[str, Form()] = None,
-    current_user: UserInDB = Depends(get_current_user)
-):
-    if current_user:
-        response = await update_pura_data(
-            id=id,
-            nama_pura=nama_pura,
-            description=description,
-            hariraya_id=hariraya_id,
-            golongan_id=golongan_id
-        )
-        return response
-
-# Endpoint to update pura image
-@app.put("/api/pura-besakih/update-image/{id}")
-async def update_image(
-    id: str,
-    image_file: UploadFile = File(...),
+    nama_pura: Annotated[Optional[str], Form()] = None,
+    description: Annotated[Optional[str], Form()] = None,
+    hariraya_id: Annotated[Optional[List[str]], Form()] = None,
+    golongan_id: Annotated[Optional[str], Form()] = None,
+    image_file: UploadFile = File(None),
+    audio_file: UploadFile = File(None),
     current_user: UserInDB = Depends(get_current_user)
 ):
     if current_user:
         try:
-            contents = await image_file.read()
-            # Upload image to cloudinary
-            upload_result = cloudinary.uploader.upload(
-                contents,
-                folder="pura_besakih",
-                resource_type="image"
+            response = await update_pura_data(
+                id=id,
+                nama_pura=nama_pura,
+                description=description,
+                hariraya_id=hariraya_id,
+                golongan_id=golongan_id,
+                image_file=image_file,
+                audio_file=audio_file
             )
-            image_url = upload_result.get("secure_url")
             
-            # Update pura image
-            response = await update_pura_image(id, image_url)
             if response:
-                return {"message": "Image updated successfully", "image_url": image_url}
-            else:
-                raise HTTPException(404, f"Pura dengan ID {id} tidak ditemukan")
+                return response
+            raise HTTPException(404, f"Pura dengan ID {id} tidak ditemukan")
         except Exception as e:
-            raise HTTPException(500, f"Error updating pura image: {str(e)}")
+            raise HTTPException(500, f"Error updating pura: {str(e)}")
 
-# Endpoint to update pura audio
-@app.put("/api/pura-besakih/update-audio/{id}")
-async def update_audio(
-    id: str,
-    audio_file: UploadFile = File(...),
-    current_user: UserInDB = Depends(get_current_user)
-):
-    if current_user:
-        try:
-            contents = await audio_file.read()
-            # Upload audio to cloudinary
-            upload_result = cloudinary.uploader.upload(
-                contents,
-                folder="pura_besakih_audio",
-                resource_type="auto"
-            )
-            audio_url = upload_result.get("secure_url")
-            
-            # Update pura audio
-            response = await update_pura_audio(id, audio_url)
-            if response:
-                return {"message": "Audio updated successfully", "audio_url": audio_url}
-            else:
-                raise HTTPException(404, f"Pura dengan ID {id} tidak ditemukan")
-        except Exception as e:
-            raise HTTPException(500, f"Error updating pura audio: {str(e)}")
 
 # Endpoint to delete pura besakih
 @app.delete("/api/pura-besakih/delete/{id}")

@@ -12,6 +12,7 @@ from datetime import datetime
 import re
 import os
 from typing import List
+from fastapi import UploadFile
 
 uri = "mongodb+srv://krisnajuniartha:ffx9GWKjBMaQAuMm@tugas-akhir-database.ekayh.mongodb.net/?retryWrites=true&w=majority&appName=tugas-akhir-database"
 
@@ -295,127 +296,111 @@ async def update_pura_data(
     nama_pura: str = None, 
     description: str = None, 
     hariraya_id: list = None,
-    golongan_id: str = None
+    golongan_id: str = None,
+    image_file: UploadFile = None,
+    audio_file: UploadFile = None
 ):
     try:
         object_id = ObjectId(id)
-        
+        existing_data = await collection_pura.find_one({"_id": object_id})
+        if not existing_data:
+            return None
+
         update_data = {}
         timestamps = time.time()
+        defaultNote = "Menunggu konfirmasi dari admin. Mohon ditunggu beberapa saat."
         
-        if nama_pura:
+        # Handle text fields
+        if nama_pura is not None:
             update_data["nama_pura"] = nama_pura
             
-        if description:
+        if description is not None:
             update_data["description"] = description
             
-        if hariraya_id:
-            # Process hariraya_id to ensure it's a list of individual IDs
-            processed_hariraya_ids = []
-            
-            if isinstance(hariraya_id, list):
-                for item in hariraya_id:
-                    if isinstance(item, str) and "," in item:
-                        # Split comma-separated string into individual IDs
-                        ids = [id.strip() for id in item.split(",")]
-                        processed_hariraya_ids.extend(ids)
-                    else:
-                        processed_hariraya_ids.append(item)
-            elif isinstance(hariraya_id, str):
-                # If hariraya_id is a single string with comma-separated values
-                if "," in hariraya_id:
-                    processed_hariraya_ids = [id.strip() for id in hariraya_id.split(",")]
-                else:
-                    processed_hariraya_ids = [hariraya_id]
-                    
+        if hariraya_id is not None:
+            processed_hariraya_ids = process_hariraya_ids(hariraya_id)
             update_data["hariraya_id"] = processed_hariraya_ids
-            
-        if golongan_id:
+                
+        if golongan_id is not None:
             update_data["golongan_id"] = golongan_id
+        
+        # Handle image upload
+        if image_file and image_file.filename:
+            # Hapus gambar lama jika ada
+            old_image = existing_data.get("image_pura")
+            if old_image and old_image != "none":
+                public_id = extract_public_id(old_image)
+                if public_id:
+                    try:
+                        cloudinary.uploader.destroy(public_id)
+                    except Exception as e:
+                        print(f"Error deleting old image: {e}")
             
+            # Upload gambar baru
+            contents = await image_file.read()
+            upload_result = cloudinary.uploader.upload(
+                contents,
+                folder="pura_besakih",
+                resource_type="image"
+            )
+            update_data["image_pura"] = upload_result.get("secure_url")
+            await image_file.close()
+        
+        # Handle audio upload
+        if audio_file and audio_file.filename:
+            # Hapus audio lama jika ada
+            old_audio = existing_data.get("audio_description")
+            if old_audio and old_audio != "none":
+                public_id = extract_public_id(old_audio)
+                if public_id:
+                    try:
+                        cloudinary.uploader.destroy(public_id)
+                    except Exception as e:
+                        print(f"Error deleting old audio: {e}")
+            
+            # Upload audio baru
+            audio_contents = await audio_file.read()
+            audio_upload_result = cloudinary.uploader.upload(
+                audio_contents,
+                folder="pura_besakih_audio",
+                resource_type="auto"
+            )
+            update_data["audio_description"] = audio_upload_result.get("secure_url")
+            await audio_file.close()
+        
         if update_data:
+            # Set status to Pending seperti di API instrumen
+            status = await get_status()
+            status_id: str = ""
+            if status:
+                for status_list in status["status_list"]:
+                    if status_list.get("status") == "Pending":
+                        status_id = status_list.get("_id", "")
+                        break
+            
+            update_data["status_id"] = status_id
             update_data["updatedAt"] = timestamps
             
-        result = await collection_pura.update_one(
-            {"_id": object_id},
-            {"$set": update_data}
-        )
-        
-        if result.modified_count > 0:
-            return {"message": "Successfully Updated Pura Besakih!", "updated_data": update_data}
-        else:
-            return {"message": "No changes made to the pura"}
+            # # Update note
+            # await updateNote(id, defaultNote, status_id)
             
-    except Exception as e:
-        print(f"Error updating pura: {e}")
-        return {"message": f"Error updating pura: {str(e)}"}
-
-async def update_pura_image(id: str, image: str):
-    try:
-        object_id = ObjectId(id)
-        
-        # Ambil image lama untuk dihapus dari cloudinary
-        document = await collection_pura.find_one({"_id": object_id})
-        if document and document.get("image_pura") != "none":
-            old_image = document.get("image_pura")
-            public_id = extract_public_id(old_image)
-            if public_id:
-                try:
-                    # Hapus image lama dari cloudinary
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print(f"Error deleting old image from cloudinary: {e}")
-        
-        timestamps = time.time()
-        updated_data = {
-            "image_pura": image,
-            "updatedAt": timestamps
-        }
-        
-        await collection_pura.update_one(
-            {"_id": object_id},
-            {"$set": updated_data}
-        )
-        
+            await collection_pura.update_one(
+                {"_id": object_id},
+                {"$set": update_data}
+            )
+            
+        # Return data terbaru
         updated_document = await collection_pura.find_one({"_id": object_id})
-        return updated_document
-        
-    except Exception as e:
-        print(f"Error updating pura image: {e}")
+        if updated_document:
+            updated_document["_id"] = str(updated_document["_id"])
+            return {
+                "message": "Data updated successfully", 
+                "Updated_data": updated_document
+            }
         return None
-
-async def update_pura_audio(id: str, audio: str):
-    try:
-        object_id = ObjectId(id)
-        
-        # Ambil audio lama untuk dihapus dari cloudinary
-        document = await collection_pura.find_one({"_id": object_id})
-        if document and document.get("audio_description") != "none":
-            old_audio = document.get("audio_description")
-            public_id = extract_public_id(old_audio)
-            if public_id:
-                try:
-                    # Hapus audio lama dari cloudinary
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print(f"Error deleting old audio from cloudinary: {e}")
-        
-        timestamps = time.time()
-        updated_data = {
-            "audio_description": audio,
-            "updatedAt": timestamps
-        }
-        
-        await collection_pura.update_one(
-            {"_id": object_id},
-            {"$set": updated_data}
-        )
-        
-        updated_document = await collection_pura.find_one({"_id": object_id})
-        return updated_document
         
     except Exception as e:
-        print(f"Error updating pura audio: {e}")
+        print(f"Error in update: {e}")
         return None
 
 async def delete_pura_data(id: str):
@@ -737,3 +722,24 @@ async def fetch_pura_by_golongan(golongan: str):
     except Exception as e:
         print(f"Error fetching pura by golongan: {e}")
         return {"error": str(e)}
+
+def process_hariraya_ids(hariraya_id):
+    """Process hariraya_id input into a list of valid IDs"""
+    processed_ids = []
+    
+    if isinstance(hariraya_id, list):
+        for item in hariraya_id:
+            if isinstance(item, str):
+                if "," in item:
+                    processed_ids.extend([id.strip() for id in item.split(",") if id.strip()])
+                else:
+                    if item.strip():
+                        processed_ids.append(item.strip())
+    elif isinstance(hariraya_id, str):
+        if "," in hariraya_id:
+            processed_ids = [id.strip() for id in hariraya_id.split(",") if id.strip()]
+        else:
+            if hariraya_id.strip():
+                processed_ids = [hariraya_id.strip()]
+    
+    return processed_ids
