@@ -47,10 +47,11 @@ from databases.purabesakihdatabase import (
     update_pura_data,
     delete_pura_data,
     approval_pura_data,
-    fetch_pura_by_filter_status,
+
     fetch_pura_by_nama,
     fetch_pura_by_golongan,
-    get_golongan
+    get_golongan,
+    fetch_pura_by_filter
 )
 
 from databases.beritapuradatabase import (
@@ -763,18 +764,20 @@ async def approve_pura(
         return {"message": response}
 
 # Endpoint to filter pura by status
-@app.post("/api/pura-besakih/filterstatus")
-async def filter_pura_by_status(
-    statusId: Annotated[list[str], Form()],
+@app.post("/api/pura-besakih/filter")
+async def get_pura_data_by_filter(
+    statusId: Annotated[list[str], Form()] = [], 
+    golonganId: Annotated[list[str], Form()] = [], 
     current_user: UserInDB = Depends(get_current_user)
 ):
     if current_user:
-        if not statusId:
-            raise HTTPException(400, "Parameter statusId diperlukan")
-        response = await fetch_pura_by_filter_status(statusId)
-        if response:
+        # Panggil fungsi fetch yang baru dengan kedua parameter
+        response = await fetch_pura_by_filter(statusId, golonganId)
+        if response and response.get("data_pura"):
             return response
-        raise HTTPException(404, "Data tidak ditemukan untuk filter yang diberikan")
+        # Jika tidak ada data, kembalikan list kosong sesuai format
+        return {"data_pura": []}
+    raise HTTPException(401, "Unauthorized")
 
 # Endpoint to search pura by name
 @app.get("/api/pura-besakih/search/{nama_pura}")
