@@ -471,40 +471,46 @@ async def approval_pura_data(id: str, status: str):
         print(f"Error approving pura: {e}")
         return f"Error: {str(e)}"
 
-async def fetch_pura_by_filter_status(status: list[str]):
+async def fetch_pura_by_filter(statusId: list[str], golonganId: list[str]):
     pura_list = []
-   
-    # Pastikan status adalah list
-    if not isinstance(status, list):
-        status = [status]
-   
-    # Bersihkan status dari tanda kutip jika ada
-    if status:
-        status = [re.sub(r'^"|"$', '', s) for s in status]
-   
+    
+    # Membuat filter query secara dinamis
+    filter_query = {}
+
+    # Membersihkan dan menambahkan filter status jika ada
+    if statusId:
+        cleaned_status_ids = [re.sub(r'^"|"$', '', s) for s in statusId]
+        if cleaned_status_ids:
+            filter_query["status_id"] = {"$in": cleaned_status_ids}
+
+    # Membersihkan dan menambahkan filter golongan jika ada
+    if golonganId:
+        cleaned_golongan_ids = [re.sub(r'^"|"$', '', g) for g in golonganId]
+        if cleaned_golongan_ids:
+            filter_query["golongan_id"] = {"$in": cleaned_golongan_ids}
+            
     try:
-        # Query database dengan filter status_id
-        cursor = collection_pura.find({"status_id": {"$in": status}})
-       
-        # Proses hasil query
+        # Jalankan query hanya jika ada filter yang diterapkan
+        if filter_query:
+            cursor = collection_pura.find(filter_query)
+        else:
+            # Jika tidak ada filter sama sekali, kembalikan semua data
+            cursor = collection_pura.find({})
+
+        # Bagian ini sama persis dengan fungsi fetch_pura_by_filter_status Anda
+        # untuk memastikan struktur data respons tidak berubah.
         async for document in cursor:
             # Process timestamps
             ts = document.get("createdAt")
-            if ts is not None:
-                dt = datetime.fromtimestamp(ts)
-                tanggal = dt.date()
-                waktu = dt.time()
-            else:
-                dt, tanggal, waktu = None, None, None
+            dt = datetime.fromtimestamp(ts) if ts else None
+            tanggal = dt.date() if dt else None
+            waktu = dt.time() if dt else None
 
             updateTs = document.get("updatedAt")
-            if updateTs is not None:
-                updateDt = datetime.fromtimestamp(updateTs)
-                updateTanggal = updateDt.date()
-                updateWaktu = updateDt.time()
-            else:
-                updateDt, updateTanggal, updateWaktu = None, None, None
-           
+            updateDt = datetime.fromtimestamp(updateTs) if updateTs else None
+            updateTanggal = updateDt.date() if updateDt else None
+            updateWaktu = updateDt.time() if updateDt else None
+            
             # Get hariraya information
             hariraya_info = []
             if "hariraya_id" in document and document["hariraya_id"]:
@@ -519,17 +525,17 @@ async def fetch_pura_by_filter_status(status: list[str]):
                             })
                     except Exception as e:
                         print(f"Error fetching hariraya info: {e}")
-           
-            # Get status information - sekarang menyimpan nama status langsung di objek respons
+            
+            # Get status information
             status_name = ""
-            if "status_id" in document:
+            if "status_id" in document and document.get("status_id"):
                 try:
                     status_doc = await collection_status.find_one({"_id": ObjectId(document["status_id"])})
                     if status_doc:
                         status_name = status_doc.get("status", "")
                 except Exception as e:
                     print(f"Error fetching status info: {e}")
-           
+            
             pura_data = {
                 "_id": str(document["_id"]),
                 "nama_pura": document.get("nama_pura", ""),
@@ -537,7 +543,7 @@ async def fetch_pura_by_filter_status(status: list[str]):
                 "audio_description": document.get("audio_description", ""),
                 "image_pura": document.get("image_pura", ""),
                 "status_id": document.get("status_id", ""),
-                "status": status_name,  # Menyimpan nama status langsung seperti di berita
+                "status": status_name,
                 "hariraya_id": document.get("hariraya_id", []),
                 "hariraya_info": hariraya_info,
                 "golongan_id": document.get("golongan_id", ""),
@@ -548,12 +554,11 @@ async def fetch_pura_by_filter_status(status: list[str]):
                 "updatedDate": str(updateTanggal) if updateTanggal else None,
                 "updateTime": str(updateWaktu) if updateWaktu else None
             }
-            
             pura_list.append(pura_data)
     
         return {"data_pura": pura_list}
     except Exception as e:
-        print(f"Error fetching pura by status: {e}")
+        print(f"Error fetching pura by filter: {e}")
         return {"error": str(e)}
 
 # Function to search pura by nama
