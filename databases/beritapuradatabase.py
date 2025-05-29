@@ -82,10 +82,11 @@ async def fetch_one_berita(id: str):
             "updateTime": str(updateWaktu)
         }
 
-        return berita_data
+        return {"data_berita": [berita_data]}
     except Exception as e:
-        print(f"Error fetching berita: {e}")
-        return None
+        print(f"Error fetching pura: {e}")
+        # Mengembalikan list kosong dalam wrapper jika terjadi error
+        return {"data_berita": [], "error": str(e)}
 
 async def fetch_all_berita():
     berita_list = []
