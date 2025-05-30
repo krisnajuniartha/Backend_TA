@@ -461,7 +461,7 @@ async def update_berita_endpoint(
     id: str, 
     judul_berita: Optional[str] = Form(None), 
     description: Optional[str] = Form(None),
-    foto: Optional[UploadFile] = File(None),
+    foto_berita: Optional[UploadFile] = File(None),
     current_user: UserInDB = Depends(get_current_user)
 ):
     if not current_user:
@@ -476,7 +476,7 @@ async def update_berita_endpoint(
             id=id,
             judul_berita=judul_berita,
             description=description,
-            foto=foto
+            foto_berita=foto_berita
         )
         
         if updated_berita:

@@ -165,43 +165,58 @@ async def update_berita_data(
         update_data = {}
         timestamps = time.time()
         
-        # Handle text fields
-        if judul_berita is not None:
+        # Pertahankan nilai lama jika field tidak disertakan
+        if judul_berita is not None:  # Hanya update jika field disertakan
             update_data["judul_berita"] = judul_berita
-            
+        # Jika tidak disertakan, tidak dimasukkan ke update_data
+        
         if description is not None:
             update_data["description"] = description
         
         # Handle image upload
-        if foto_berita and foto_berita.filename:
-            # Hapus foto lama jika ada
-            old_foto = existing_data.get("foto_berita")
-            if old_foto and old_foto != "none":
-                public_id = extract_public_id(old_foto)
-                if public_id:
-                    try:
-                        cloudinary.uploader.destroy(public_id)
-                    except Exception as e:
-                        print(f"Error deleting old photo: {e}")
-            
-            # Upload foto baru
-            contents = await foto_berita.read()
-            upload_result = cloudinary.uploader.upload(
-                contents,
-                folder="berita-pura",
-                resource_type="auto"
-            )
-            update_data["foto_berita"] = upload_result.get("secure_url")
-            await foto_berita.close()
+        if foto_berita is not None:  # Field disertakan dalam request
+            if foto_berita.filename:  # Jika ada file baru
+                # Hapus foto lama jika ada
+                old_foto = existing_data.get("foto_berita")
+                if old_foto and old_foto != "none":
+                    public_id = extract_public_id(old_foto)
+                    if public_id:
+                        try:
+                            cloudinary.uploader.destroy(public_id)
+                        except Exception as e:
+                            print(f"Error deleting old photo: {e}")
+                
+                # Upload foto baru
+                contents = await foto_berita.read()
+                upload_result = cloudinary.uploader.upload(
+                    contents,
+                    folder="berita-pura",
+                    resource_type="auto"
+                )
+                update_data["foto_berita"] = upload_result.get("secure_url")
+                await foto_berita.close()
+            else:  # Jika filename kosong (artinya ingin menghapus foto)
+                old_foto = existing_data.get("foto_berita")
+                if old_foto and old_foto != "none":
+                    public_id = extract_public_id(old_foto)
+                    if public_id:
+                        try:
+                            cloudinary.uploader.destroy(public_id)
+                        except Exception as e:
+                            print(f"Error deleting old photo: {e}")
+                update_data["foto_berita"] = "none"  # atau null sesuai kebutuhan
         
-        if update_data:
-            update_data["updatedAt"] = timestamps
+        # Jika tidak ada field yang diupdate, kembalikan data asli
+        if not update_data:
+            return existing_data
             
-            await collection_berita.update_one(
-                {"_id": object_id},
-                {"$set": update_data}
-            )
-            
+        update_data["updatedAt"] = timestamps
+        
+        await collection_berita.update_one(
+            {"_id": object_id},
+            {"$set": update_data}
+        )
+        
         # Return data terbaru
         updated_document = await collection_berita.find_one({"_id": object_id})
         if updated_document:
