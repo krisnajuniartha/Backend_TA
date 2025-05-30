@@ -10,6 +10,7 @@ from cloudinary.utils import cloudinary_url
 import time
 from datetime import datetime
 import re
+from fastapi import UploadFile
 
 
 
@@ -149,70 +150,69 @@ async def create_berita_data(judul_berita: str, description: str, foto_berita: s
         "message": "Berita created successfully"
     }
 
-async def update_berita_data(id: str, judul_berita: str = None, description: str = None):
+async def update_berita_data(
+    id: str, 
+    judul_berita: str = None, 
+    description: str = None,
+    foto_berita: UploadFile = None
+):
     try:
         object_id = ObjectId(id)
-        
+        existing_data = await collection_berita.find_one({"_id": object_id})
+        if not existing_data:
+            return None
+
         update_data = {}
         timestamps = time.time()
         
-        if judul_berita:
+        # Handle text fields
+        if judul_berita is not None:
             update_data["judul_berita"] = judul_berita
             
-        if description:
+        if description is not None:
             update_data["description"] = description
+        
+        # Handle image upload
+        if foto_berita and foto_berita.filename:
+            # Hapus foto lama jika ada
+            old_foto = existing_data.get("foto_berita")
+            if old_foto and old_foto != "none":
+                public_id = extract_public_id(old_foto)
+                if public_id:
+                    try:
+                        cloudinary.uploader.destroy(public_id)
+                    except Exception as e:
+                        print(f"Error deleting old photo: {e}")
             
+            # Upload foto baru
+            contents = await foto_berita.read()
+            upload_result = cloudinary.uploader.upload(
+                contents,
+                folder="berita-pura",
+                resource_type="auto"
+            )
+            update_data["foto_berita"] = upload_result.get("secure_url")
+            await foto_berita.close()
+        
         if update_data:
             update_data["updatedAt"] = timestamps
             
-        result = await collection_berita.update_one(
-            {"_id": object_id},
-            {"$set": update_data}
-        )
-        
-        if result.modified_count > 0:
-            return {"message": "Successfully Updated Berita!", "updated_data": update_data}
-        else:
-            return {"message": "No changes made to the berita"}
+            await collection_berita.update_one(
+                {"_id": object_id},
+                {"$set": update_data}
+            )
             
-    except Exception as e:
-        print(f"Error updating berita: {e}")
-        return {"message": f"Error updating berita: {str(e)}"}
-
-async def update_berita_foto(id: str, foto: str):
-    try:
-        object_id = ObjectId(id)
-        
-        # Ambil foto lama untuk dihapus dari cloudinary
-        document = await collection_berita.find_one({"_id": object_id})
-        if document and document.get("foto_berita") != "none":
-            old_foto = document.get("foto_berita")
-            public_id = extract_public_id(old_foto)
-            if public_id:
-                try:
-                    # Hapus foto lama dari cloudinary
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print(f"Error deleting old photo from cloudinary: {e}")
-        
-        timestamps = time.time()
-        updated_data = {
-            "foto_berita": foto,
-            "updatedAt": timestamps
-        }
-        
-        await collection_berita.update_one(
-            {"_id": object_id},
-            {"$set": updated_data}
-        )
-        
+        # Return data terbaru
         updated_document = await collection_berita.find_one({"_id": object_id})
-        return updated_document
+        if updated_document:
+            updated_document["_id"] = str(updated_document["_id"])
+            return updated_document
+        return None
         
     except Exception as e:
-        print(f"Error updating berita photo: {e}")
+        print(f"Error in update: {e}")
         return None
-
+    
 async def delete_berita_data(id: str):
     try:
         object_id = ObjectId(id)

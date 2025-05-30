@@ -63,7 +63,6 @@ from databases.beritapuradatabase import (
     approval_berita_data,
     fetch_berita_by_filter_status,
     fetch_berita_by_title,
-    update_berita_foto
 )
 
 from databases.harirayadatabase import (
@@ -458,7 +457,7 @@ async def create_berita_data_endpoint(
         raise HTTPException(500, f"Gagal membuat berita: {str(e)}")
 
 @app.put("/api/beritadata/updateberita/{id}")
-async def update_berita_data_endpoint(
+async def update_berita_endpoint(
     id: str, 
     judul_berita: Optional[str] = Form(None), 
     description: Optional[str] = Form(None),
@@ -472,30 +471,23 @@ async def update_berita_data_endpoint(
     if not berita:
         raise HTTPException(404, f"Berita dengan ID {id} tidak ditemukan")
     
-    # Update judul dan deskripsi
-    if judul_berita is not None or description is not None:
-        await update_berita_data(id, judul_berita, description)
-    
-    # Update foto jika disediakan
-    if foto:
-        try:
-            # Upload foto baru ke cloudinary
-            result = cloudinary.uploader.upload(
-                foto.file,
-                folder="berita-pura",  # Sesuaikan dengan folder di Cloudinary
-                resource_type="auto"
-            )
-            
-            foto_url = result.get("secure_url")
-            
-            # Update foto berita di database
-            await update_berita_foto(id, foto_url)
-        except Exception as e:
-            raise HTTPException(500, f"Gagal memperbarui foto berita: {str(e)}")
-    
-    # Ambil data berita yang sudah diupdate
-    updated_berita = await fetch_one_berita(id)
-    return {"message": "Berita berhasil diperbarui", "berita": updated_berita}
+    try:
+        updated_berita = await update_berita_data(
+            id=id,
+            judul_berita=judul_berita,
+            description=description,
+            foto=foto
+        )
+        
+        if updated_berita:
+            return {
+                "message": "Berita berhasil diperbarui", 
+                "berita": updated_berita
+            }
+        raise HTTPException(400, "Gagal memperbarui berita")
+        
+    except Exception as e:
+        raise HTTPException(500, f"Terjadi kesalahan: {str(e)}")
 
 
 @app.put("/api/beritadata/approval/{id}")
