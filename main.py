@@ -433,7 +433,7 @@ async def get_berita_by_status_data(statusId: Annotated[list[str], Form()], curr
 async def create_berita_data_endpoint(
     judul_berita: str = Form(...),
     description: str = Form(...),
-    foto: UploadFile = File(...),
+    foto_berita: UploadFile = File(...),
     status: str = Form("678a4449e3ce40b8dc1f014c"),
     current_user: UserInDB = Depends(get_current_user)
 ):
@@ -443,7 +443,7 @@ async def create_berita_data_endpoint(
     try:
         # Upload foto ke cloudinary
         result = cloudinary.uploader.upload(
-            foto.file,
+            foto_berita.file,
             folder="berita",
             resource_type="auto"
         )
