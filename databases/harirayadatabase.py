@@ -8,6 +8,8 @@ from datetime import datetime
 import re
 import os
 from typing import List
+import datetime  # Pastikan import ini ada di bagian atas file Anda
+from bson import ObjectId
 
 
 uri = "mongodb+srv://krisnajuniartha:ffx9GWKjBMaQAuMm@tugas-akhir-database.ekayh.mongodb.net/?retryWrites=true&w=majority&appName=tugas-akhir-database"
@@ -38,6 +40,29 @@ async def get_status():
 
     return {"status_list": status}
 
+
+def format_timestamp_to_iso_utc_z(ts_float: float | None) -> str | None:
+    """
+    Mengonversi Unix timestamp (float) menjadi string ISO 8601 UTC dengan penanda 'Z'.
+    Contoh output: "2023-05-31T10:15:30Z" atau "2023-05-31T10:15:30.123Z"
+    """
+    if ts_float is None:
+        return None
+    try:
+        # Buat datetime object yang UTC-aware dari timestamp
+        dt_utc = datetime.datetime.fromtimestamp(ts_float, tz=datetime.timezone.utc)
+        
+        # Format ke ISO string. isoformat() pada datetime UTC-aware akan menghasilkan offset +00:00
+        iso_string = dt_utc.isoformat()
+        
+        # Ganti +00:00 dengan Z untuk format yang lebih umum
+        if iso_string.endswith("+00:00"):
+            return iso_string[:-6] + "Z"
+        return iso_string # Seharusnya tidak terjadi jika tz=datetime.timezone.utc benar
+    except Exception:
+        # Tambahkan logging error jika diperlukan
+        return None # Atau kembalikan string error, atau raise exception
+
 async def fetch_one_hariraya(id: str):
     try:
         object_id = ObjectId(id)
@@ -46,110 +71,64 @@ async def fetch_one_hariraya(id: str):
         if not document:
             return None
         
-        # Process timestamps
-        tanggal_mulai = document.get("tanggal_mulai")
-        if tanggal_mulai is not None:
-            tanggal_mulai_dt = datetime.fromtimestamp(tanggal_mulai)
-        else:
-            tanggal_mulai_dt = None
+        # Mengambil dan memformat tanggal/waktu terpisah (berdasarkan UTC)
+        created_dt_utc = datetime.datetime.fromtimestamp(document.get("createdAt"), tz=datetime.timezone.utc) if document.get("createdAt") else None
+        updated_dt_utc = datetime.datetime.fromtimestamp(document.get("updatedAt"), tz=datetime.timezone.utc) if document.get("updatedAt") else None
 
-        tanggal_berakhir = document.get("tanggal_berakhir")
-        if tanggal_berakhir is not None:
-            tanggal_berakhir_dt = datetime.fromtimestamp(tanggal_berakhir)
-        else:
-            tanggal_berakhir_dt = None
-
-        created_ts = document.get("createdAt")
-        if created_ts is not None:
-            created_dt = datetime.fromtimestamp(created_ts)
-            created_tanggal = created_dt.date()
-            created_waktu = created_dt.time()
-        else:
-            created_dt, created_tanggal, created_waktu = None, None, None
-
-        updated_ts = document.get("updatedAt")
-        if updated_ts is not None:
-            updated_dt = datetime.fromtimestamp(updated_ts)
-            updated_tanggal = updated_dt.date()
-            updated_waktu = updated_dt.time()
-        else:
-            updated_dt, updated_tanggal, updated_waktu = None, None, None
-        
         hariraya_data = {
             "_id": str(document["_id"]),
-            "nama_hari_raya": document["nama_hari_raya"],
-            "description": document["description"],
-            "tanggal_mulai": tanggal_mulai_dt,
-            "tanggal_berakhir": tanggal_berakhir_dt,
-            "status_id": document["status_id"],
-            "createdAt": created_dt,
-            "createdDate": str(created_tanggal),
-            "createdTime": str(created_waktu),
-            "updatedAt": updated_dt,
-            "updatedDate": str(updated_tanggal),
-            "updateTime": str(updated_waktu)
+            "nama_hari_raya": document.get("nama_hari_raya"),
+            "description": document.get("description"),
+            "tanggal_mulai": format_timestamp_to_iso_utc_z(document.get("tanggal_mulai")),
+            "tanggal_berakhir": format_timestamp_to_iso_utc_z(document.get("tanggal_berakhir")),
+            "status_id": document.get("status_id"),
+            "createdAt": format_timestamp_to_iso_utc_z(document.get("createdAt")),
+            "createdDate": created_dt_utc.strftime('%Y-%m-%d') if created_dt_utc else None,
+            "createdTime": created_dt_utc.strftime('%H:%M:%S') if created_dt_utc else None,
+            "updatedAt": format_timestamp_to_iso_utc_z(document.get("updatedAt")),
+            "updatedDate": updated_dt_utc.strftime('%Y-%m-%d') if updated_dt_utc else None,
+            "updateTime": updated_dt_utc.strftime('%H:%M:%S') if updated_dt_utc else None,
         }
-       
-        
-        return {"data_hariraya": [hariraya_data]}
+        # Perhatikan: FastAPI secara otomatis akan meng-handle serialisasi dictionary ini ke JSON
+        return {"data_hariraya": [hariraya_data]} 
     
     except Exception as e:
-        print(f"Error fetching hari raya: {e}")
-        return {"data_hariraya": [], "error": str(e)}
+        print(f"Error fetching one hari raya (id: {id}): {e}")
+        # Di lingkungan produksi, Anda mungkin ingin log error ini dengan lebih baik
+        # dan menghindari pengiriman detail error internal ke klien.
+        # Untuk sekarang, mengembalikan error agar jelas saat development:
+        # raise HTTPException(status_code=500, detail=f"Internal server error while fetching data for id {id}")
+        # Atau, jika Anda ingin mengembalikan struktur yang sama dengan pesan error:
+        return {"data_hariraya": [], "error_message": f"Error processing data for id {id}: {str(e)}"}
 
 async def fetch_all_hariraya():
     hariraya_list = []
-    
-    cursor = collection_hariraya.find({})
-    
-    async for document in cursor:
-        # Process timestamps
-        tanggal_mulai = document.get("tanggal_mulai")
-        if tanggal_mulai is not None:
-            tanggal_mulai_dt = datetime.fromtimestamp(tanggal_mulai)
-        else:
-            tanggal_mulai_dt = None
+    try:
+        cursor = collection_hariraya.find({})
+        async for document in cursor:
+            created_dt_utc = datetime.datetime.fromtimestamp(document.get("createdAt"), tz=datetime.timezone.utc) if document.get("createdAt") else None
+            updated_dt_utc = datetime.datetime.fromtimestamp(document.get("updatedAt"), tz=datetime.timezone.utc) if document.get("updatedAt") else None
 
-        tanggal_berakhir = document.get("tanggal_berakhir")
-        if tanggal_berakhir is not None:
-            tanggal_berakhir_dt = datetime.fromtimestamp(tanggal_berakhir)
-        else:
-            tanggal_berakhir_dt = None
-
-        created_ts = document.get("createdAt")
-        if created_ts is not None:
-            created_dt = datetime.fromtimestamp(created_ts)
-            created_tanggal = created_dt.date()
-            created_waktu = created_dt.time()
-        else:
-            created_dt, created_tanggal, created_waktu = None, None, None
-
-        updated_ts = document.get("updatedAt")
-        if updated_ts is not None:
-            updated_dt = datetime.fromtimestamp(updated_ts)
-            updated_tanggal = updated_dt.date()
-            updated_waktu = updated_dt.time()
-        else:
-            updated_dt, updated_tanggal, updated_waktu = None, None, None
-        
-        hariraya_data = {
-            "_id": str(document["_id"]),
-            "nama_hari_raya": document.get("nama_hari_raya", ""),
-            "description": document.get("description", ""),
-            "tanggal_mulai": tanggal_mulai_dt,
-            "tanggal_berakhir": tanggal_berakhir_dt,
-            "status_id": document.get("status_id", ""),
-            "createdAt": created_dt,
-            "createdDate": str(created_tanggal) if created_tanggal else None,
-            "createdTime": str(created_waktu) if created_waktu else None,
-            "updatedAt": updated_dt,
-            "updatedDate": str(updated_tanggal) if updated_tanggal else None,
-            "updateTime": str(updated_waktu) if updated_waktu else None
-        }
-        
-        hariraya_list.append(hariraya_data)
-    
-    return {"data_hariraya": hariraya_list}
+            hariraya_data = {
+                "_id": str(document["_id"]),
+                "nama_hari_raya": document.get("nama_hari_raya", ""),
+                "description": document.get("description", ""),
+                "tanggal_mulai": format_timestamp_to_iso_utc_z(document.get("tanggal_mulai")),
+                "tanggal_berakhir": format_timestamp_to_iso_utc_z(document.get("tanggal_berakhir")),
+                "status_id": document.get("status_id", ""),
+                "createdAt": format_timestamp_to_iso_utc_z(document.get("createdAt")),
+                "createdDate": created_dt_utc.strftime('%Y-%m-%d') if created_dt_utc else None,
+                "createdTime": created_dt_utc.strftime('%H:%M:%S') if created_dt_utc else None,
+                "updatedAt": format_timestamp_to_iso_utc_z(document.get("updatedAt")),
+                "updatedDate": updated_dt_utc.strftime('%Y-%m-%d') if updated_dt_utc else None,
+                "updateTime": updated_dt_utc.strftime('%H:%M:%S') if updated_dt_utc else None,
+            }
+            hariraya_list.append(hariraya_data)
+        return {"data_hariraya": hariraya_list}
+    except Exception as e:
+        print(f"Error fetching all hari raya: {e}")
+        # raise HTTPException(status_code=500, detail="Internal server error while fetching all data")
+        return {"data_hariraya": [], "error_message": f"Error processing data: {str(e)}"}
 
 async def create_hariraya_data(nama_hari_raya: str, description: str, tanggal_mulai: float, tanggal_berakhir: float, status_id: str = "678a4449e3ce40b8dc1f014c"):
     timestamps = time.time()
