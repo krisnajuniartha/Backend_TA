@@ -89,8 +89,10 @@ async def fetch_one_hariraya(id: str):
             "updatedDate": str(updated_tanggal),
             "updateTime": str(updated_waktu)
         }
-
-        return hariraya_data
+       
+        
+        return {"data_hariraya": hariraya_data}
+    
     except Exception as e:
         print(f"Error fetching hari raya: {e}")
         return None
