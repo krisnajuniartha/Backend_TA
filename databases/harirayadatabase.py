@@ -91,11 +91,11 @@ async def fetch_one_hariraya(id: str):
         }
        
         
-        return {"data_hariraya": hariraya_data}
+        return {"data_hariraya": [hariraya_data]}
     
     except Exception as e:
         print(f"Error fetching hari raya: {e}")
-        return None
+        return {"data_hariraya": [], "error": str(e)}
 
 async def fetch_all_hariraya():
     hariraya_list = []
