@@ -257,7 +257,7 @@ async def fetch_all_user():
 
         user.append(user_data)
 
-    return user
+    return {"data_user": user}
 
 
 async def fetch_pengguna_by_filter(role: list[str], statusId: list[str]):
