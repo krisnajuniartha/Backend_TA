@@ -404,25 +404,56 @@ async def update_user_photo(id: str, foto: str):
     return document
 
 async def delete_user_data(id: str):
-    object_id = ObjectId(id)
+    try:
+        # Konversi ID ke ObjectId, tangani jika formatnya salah
+        object_id = ObjectId(id)
+    except Exception:
+        print(f"Format ObjectId tidak valid: {id}")
+        return False # Kembalikan False jika ID tidak valid
+
+    # 1. GUNAKAN find_one UNTUK EFISIENSI
+    # Ambil dokumen pengguna sekali saja
+    document = await collection_pengguna.find_one({"_id": object_id})
+
+    # Jika tidak ada pengguna dengan ID tersebut, hentikan proses
+    if not document:
+        print(f"Pengguna dengan ID {id} tidak ditemukan.")
+        return False
+
+    # 2. GUNAKAN .get() YANG AMAN UNTUK MENGHINDARI KeyError
+    # Hapus foto profil jika ada
+    foto_profile_url = document.get("foto_profile")
+    if foto_profile_url and foto_profile_url != "none":
+        try:
+            public_id = extract_public_id(foto_profile_url)
+            if public_id:
+                cloudinary.uploader.destroy(public_id)
+                print(f"Foto profil untuk user {id} berhasil dihapus dari Cloudinary.")
+        except Exception as e:
+            # Jika gagal, cukup catat error dan lanjutkan proses
+            print(f"PERINGATAN: Gagal menghapus foto profil dari Cloudinary: {e}")
+
+    # Hapus support document jika ada (logika yang sama)
+    support_document_url = document.get("support_document")
+    if support_document_url and support_document_url != "none":
+        try:
+            public_id = extract_public_id(support_document_url)
+            if public_id:
+                cloudinary.uploader.destroy(public_id)
+                print(f"Support document untuk user {id} berhasil dihapus dari Cloudinary.")
+        except Exception as e:
+            print(f"PERINGATAN: Gagal menghapus support document dari Cloudinary: {e}")
+
+    # 3. HAPUS DATA PENGGUNA DARI DATABASE
+    delete_result = await collection_pengguna.delete_one({"_id": object_id})
     
-    foto_profile = []
-
-    cursor = collection_pengguna.find({"_id": object_id})
-
-    async for document in cursor:
-        foto_profile_data = document["foto_profile"]
-    
-        foto_profile.append(foto_profile_data)
-
-    for path_todelete_foto in foto_profile:
-        public_id = extract_public_id(path_todelete_foto)
-
-        cloudinary.uploader.destroy(public_id)
-    
-    await collection_pengguna.delete_one({"_id": object_id})
-
-    return True
+    # Pastikan data benar-benar terhapus
+    if delete_result.deleted_count == 1:
+        print(f"Data pengguna dengan ID {id} berhasil dihapus dari database.")
+        return True # Sukses
+    else:
+        print(f"Gagal menghapus pengguna dengan ID {id} dari database (kemungkinan sudah hilang).")
+        return False
 
 def extract_public_id(secure_url):
     pattern = r"/upload/(?:v\d+/)?(.+)\.\w+$"

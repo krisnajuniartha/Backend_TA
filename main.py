@@ -366,9 +366,11 @@ async def update_photo_user(id: str, foto: str):
 async def delete_data_user(id: str, current_user: UserInDB = Depends(get_current_user)):
     if current_user:
         response = await delete_user_data(id)
-        if response == True:
-            return "Successfully deleted user!"
-        raise HTTPException(404, f"There is no user with this name {id}")
+        if response:
+            # KEMBALIKAN JSON, BUKAN STRING BIASA
+            return {"message": "Pengguna berhasil dihapus!"}
+        # Jika response adalah False
+        raise HTTPException(status_code=404, detail=f"Pengguna dengan ID {id} tidak ditemukan atau gagal dihapus.")
     
 @app.get("/api/getallrole/listrole")
 async def get_role_list_data():
