@@ -82,8 +82,6 @@ from databases.virtualtourdatabase import (
     fetch_one_virtual_tour,
     create_virtual_tour_data,
     update_virtual_tour_data,
-    update_virtual_tour_panorama,
-    update_virtual_tour_thumbnail,
     delete_virtual_tour_data,
     fetch_virtual_tour_by_pura_id,
     fetch_virtual_tour_by_name,
@@ -872,91 +870,40 @@ async def create_virtual_tour_data_endpoint(
         )
 
 @app.put("/api/virtualtourdata/updatevirtualtour/{id}")
-async def update_virtual_tour_data_endpoint(
-    id: str, 
-    nama_virtual_path: Optional[str] = Form(None), 
+async def update_virtual_tour( # Nama endpoint disederhanakan
+    id: str,
+    # Semua parameter diterima di sini, sama seperti di contoh
+    nama_virtual_path: Optional[str] = Form(None),
     description_area: Optional[str] = Form(None),
-    order_index: Optional[str] = Form(None),
-    pura_id: Optional[str] = Form(None),
+    panorama_file: Optional[UploadFile] = File(None),
+    thumbnail_file: Optional[UploadFile] = File(None),
     current_user: UserInDB = Depends(get_current_user)
 ):
+    """
+    Endpoint "tipis" yang hanya menerima request dan meneruskannya.
+    """
     if not current_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tidak terautentikasi")
-        
-    virtual_tour = await fetch_one_virtual_tour(id)
-    if not virtual_tour:
-        raise HTTPException(404, f"Virtual tour dengan ID {id} tidak ditemukan")
-    
-    # Update data virtual tour
-    response = await update_virtual_tour_data(id, nama_virtual_path, description_area, order_index, pura_id)
-    
-    # Ambil data virtual tour yang sudah diupdate
-    updated_virtual_tour = await fetch_one_virtual_tour(id)
-    return {"message": "Virtual tour berhasil diperbarui", "virtual_tour": updated_virtual_tour}
-
-@app.put("/api/virtualtourdata/updatepanorama/{id}")
-async def update_virtual_tour_panorama_endpoint(
-    id: str, 
-    panorama: UploadFile = File(...),
-    current_user: UserInDB = Depends(get_current_user)
-):
-    if not current_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tidak terautentikasi")
-        
-    virtual_tour = await fetch_one_virtual_tour(id)
-    if not virtual_tour:
-        raise HTTPException(404, f"Virtual tour dengan ID {id} tidak ditemukan")
-    
-    try:
-        # Upload panorama baru ke cloudinary
-        result = cloudinary.uploader.upload(
-            panorama.file,
-            folder="virtual-tour",
-            resource_type="auto"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tidak terautentikasi"
         )
         
-        panorama_url = result.get("secure_url")
-        
-        # Update panorama virtual tour di database
-        await update_virtual_tour_panorama(id, panorama_url)
-        
-        # Ambil data virtual tour yang sudah diupdate
-        updated_virtual_tour = await fetch_one_virtual_tour(id)
-        return {"message": "Panorama virtual tour berhasil diperbarui", "virtual_tour": updated_virtual_tour}
-    except Exception as e:
-        raise HTTPException(500, f"Gagal memperbarui panorama virtual tour: {str(e)}")
-
-@app.put("/api/virtualtourdata/updatethumbnail/{id}")
-async def update_virtual_tour_thumbnail_endpoint(
-    id: str, 
-    thumbnail: UploadFile = File(...),
-    current_user: UserInDB = Depends(get_current_user)
-):
-    if not current_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Tidak terautentikasi")
-        
-    virtual_tour = await fetch_one_virtual_tour(id)
-    if not virtual_tour:
-        raise HTTPException(404, f"Virtual tour dengan ID {id} tidak ditemukan")
-    
     try:
-        # Upload thumbnail baru ke cloudinary
-        result = cloudinary.uploader.upload(
-            thumbnail.file,
-            folder="virtual-tour-thumbnails",
-            resource_type="auto"
+        # Panggil satu fungsi logic "gemuk" dengan semua parameter
+        response = await update_virtual_tour_data(
+            id=id,
+            nama_virtual_path=nama_virtual_path,
+            description_area=description_area,
+            panorama_file=panorama_file,
+            thumbnail_file=thumbnail_file
         )
         
-        thumbnail_url = result.get("secure_url")
+        if response:
+            return response
+        raise HTTPException(status_code=404, detail=f"Virtual tour dengan ID {id} tidak ditemukan")
         
-        # Update thumbnail virtual tour di database
-        await update_virtual_tour_thumbnail(id, thumbnail_url)
-        
-        # Ambil data virtual tour yang sudah diupdate
-        updated_virtual_tour = await fetch_one_virtual_tour(id)
-        return {"message": "Thumbnail virtual tour berhasil diperbarui", "virtual_tour": updated_virtual_tour}
     except Exception as e:
-        raise HTTPException(500, f"Gagal memperbarui thumbnail virtual tour: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error saat update virtual tour: {str(e)}")
 
 @app.delete("/api/virtualtourdata/deletevirtualtour/{id}")
 async def delete_virtual_tour_data_endpoint(id: str, current_user: UserInDB = Depends(get_current_user)):

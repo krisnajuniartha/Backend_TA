@@ -10,7 +10,8 @@ from cloudinary.utils import cloudinary_url
 import time 
 from datetime import datetime
 import re
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from typing import Annotated, List, Optional
 
 uri = "mongodb+srv://krisnajuniartha:ffx9GWKjBMaQAuMm@tugas-akhir-database.ekayh.mongodb.net/?retryWrites=true&w=majority&appName=tugas-akhir-database"
 
@@ -21,7 +22,7 @@ collection_virtual_tour = database["virtual-tour"]
 
 try:
     client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
+    print("Pinged your deployment. You successfully connected from virtualtourdatabase to MongoDB!")
 except Exception as e:
     print(e)
 
@@ -153,110 +154,85 @@ async def create_virtual_tour_data(nama_virtual_path: str, description_area: str
 
 
 
-async def update_virtual_tour_data(id: str, nama_virtual_path: str = None, description_area: str = None, order_index: str = None, pura_id: str = None):
+
+async def update_virtual_tour_data(
+    id: str,
+    nama_virtual_path: Optional[str] = None,
+    description_area: Optional[str] = None,
+    panorama_file: Optional[UploadFile] = None,
+    thumbnail_file: Optional[UploadFile] = None
+):
+    """
+    Fungsi "gemuk" yang melakukan semua proses update untuk virtual tour.
+    """
     try:
         object_id = ObjectId(id)
-        
+        # Ambil data lama untuk referensi (misal: menghapus file lama)
+        existing_document = await collection_virtual_tour.find_one({"_id": object_id})
+        if not existing_document:
+            return None # Akan ditangani sebagai 404 oleh endpoint
+
         update_data = {}
-        timestamps = time.time()
         
-        if nama_virtual_path:
+        ## --- Handle data teks ---
+        if nama_virtual_path is not None:
             update_data["nama_virtual_path"] = nama_virtual_path
-            
-        if description_area:
+        if description_area is not None:
             update_data["description_area"] = description_area
             
-        if order_index:
-            update_data["order_index"] = order_index
+        ## --- Handle upload file panorama ---
+        if panorama_file and panorama_file.filename:
+            # Hapus file lama dari Cloudinary jika ada
+            if old_url := existing_document.get("panorama_url"):
+                if public_id := extract_public_id(old_url):
+                    try:
+                        cloudinary.uploader.destroy(public_id, resource_type="image")
+                    except Exception as e:
+                        print(f"Gagal hapus panorama lama: {e}")
             
-        if pura_id:
-            update_data["pura_id"] = pura_id
-            
+            # Upload file baru
+            contents = await panorama_file.read()
+            upload_result = cloudinary.uploader.upload(contents, folder="virtual-tour")
+            update_data["panorama_url"] = upload_result.get("secure_url")
+            await panorama_file.close()
+
+        ## --- Handle upload file thumbnail ---
+        if thumbnail_file and thumbnail_file.filename:
+            # Hapus file lama dari Cloudinary jika ada
+            if old_url := existing_document.get("thumbnail_url"):
+                if public_id := extract_public_id(old_url):
+                    try:
+                        cloudinary.uploader.destroy(public_id, resource_type="image")
+                    except Exception as e:
+                        print(f"Gagal hapus thumbnail lama: {e}")
+
+            # Upload file baru
+            contents = await thumbnail_file.read()
+            upload_result = cloudinary.uploader.upload(contents, folder="virtual-tour-thumbnails")
+            update_data["thumbnail_url"] = upload_result.get("secure_url")
+            await thumbnail_file.close()
+
+        ## --- Lakukan update ke database jika ada perubahan ---
         if update_data:
-            update_data["updatedAt"] = timestamps
+            update_data["updatedAt"] = time.time()
             
-        result = await collection_virtual_tour.update_one(
-            {"_id": object_id},
-            {"$set": update_data}
-        )
+            await collection_virtual_tour.update_one(
+                {"_id": object_id},
+                {"$set": update_data}
+            )
         
-        if result.modified_count > 0:
-            return {"message": "Successfully Updated Virtual Tour!", "updated_data": update_data}
-        else:
-            return {"message": "No changes made to the virtual tour"}
-        
-            
-    except Exception as e:
-        print(f"Error updating virtual tour: {e}")
-        return {"message": f"Error updating virtual tour: {str(e)}"}
-
-async def update_virtual_tour_panorama(id: str, panorama_url: str):
-    try:
-        object_id = ObjectId(id)
-        
-        # Ambil panorama lama untuk dihapus dari cloudinary
-        document = await collection_virtual_tour.find_one({"_id": object_id})
-        if document and document.get("panorama_url") != "none":
-            old_panorama = document.get("panorama_url")
-            public_id = extract_public_id(old_panorama)
-            if public_id:
-                try:
-                    # Hapus panorama lama dari cloudinary
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print(f"Error deleting old panorama from cloudinary: {e}")
-        
-        timestamps = time.time()
-        updated_data = {
-            "panorama_url": panorama_url,
-            "updatedAt": timestamps
-        }
-        
-        await collection_virtual_tour.update_one(
-            {"_id": object_id},
-            {"$set": updated_data}
-        )
-        
+        # Selalu kembalikan data terbaru setelah proses selesai
         updated_document = await collection_virtual_tour.find_one({"_id": object_id})
-        return updated_document
+        updated_document["_id"] = str(updated_document["_id"])
         
-    except Exception as e:
-        print(f"Error updating virtual tour panorama: {e}")
-        return None
-
-async def update_virtual_tour_thumbnail(id: str, thumbnail_url: str):
-    try:
-        object_id = ObjectId(id)
-        
-        # Ambil thumbnail lama untuk dihapus dari cloudinary
-        document = await collection_virtual_tour.find_one({"_id": object_id})
-        if document and document.get("thumbnail_url") != "none":
-            old_thumbnail = document.get("thumbnail_url")
-            public_id = extract_public_id(old_thumbnail)
-            if public_id:
-                try:
-                    # Hapus thumbnail lama dari cloudinary
-                    cloudinary.uploader.destroy(public_id)
-                except Exception as e:
-                    print(f"Error deleting old thumbnail from cloudinary: {e}")
-        
-        timestamps = time.time()
-        updated_data = {
-            "thumbnail_url": thumbnail_url,
-            "updatedAt": timestamps
+        return {
+            "message": "Data virtual tour berhasil diperbarui",
+            "updated_data": updated_document
         }
-        
-        await collection_virtual_tour.update_one(
-            {"_id": object_id},
-            {"$set": updated_data}
-        )
-        
-        updated_document = await collection_virtual_tour.find_one({"_id": object_id})
-        return updated_document
-        
+
     except Exception as e:
-        print(f"Error updating virtual tour thumbnail: {e}")
-        return None
+        print(f"Error di logic update_virtual_tour_data: {e}")
+        raise e # Lempar exception agar ditangkap oleh endpoint
 
 async def delete_virtual_tour_data(id: str):
     try:

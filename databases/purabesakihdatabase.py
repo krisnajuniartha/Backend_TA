@@ -24,6 +24,12 @@ collection_status = database["status"]
 collection_hariraya = database["hariraya"]
 collection_golongan = database["golongan-pura"]
 
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected from purabesakihdatabase to MongoDB!")
+except Exception as e:
+    print(e)
+
 # Get status functions
 async def get_status():
     status = []
