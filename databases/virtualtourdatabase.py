@@ -10,6 +10,7 @@ from cloudinary.utils import cloudinary_url
 import time
 from datetime import datetime
 import re
+from fastapi import APIRouter, Depends, HTTPException
 
 uri = "mongodb+srv://krisnajuniartha:ffx9GWKjBMaQAuMm@tugas-akhir-database.ekayh.mongodb.net/?retryWrites=true&w=majority&appName=tugas-akhir-database"
 
@@ -113,20 +114,18 @@ async def fetch_all_virtual_tour():
     
     return {"data_virtual_tour": virtual_tour_list}
 
-async def create_virtual_tour_data(nama_virtual_path: str, description_area: str, panorama_url: str, thumbnail_url: str, pura_id: str = ""):
+async def create_virtual_tour_data(nama_virtual_path: str, description_area: str, panorama_url: str, thumbnail_url: str, pura_id: str):
     timestamps = time.time()
 
-    # Cari order_index terbesar untuk pura_id yang sama
+    # Logika mencari order_index terbesar
     existing_virtual_tours = collection_virtual_tour.find({"pura_id": pura_id}).sort("order_index", -1).limit(1)
     max_order_index = -1
-
     async for document in existing_virtual_tours:
         existing_index = document.get("order_index", -1)
         try:
             max_order_index = int(existing_index)
-        except ValueError:
+        except (ValueError, TypeError):
             max_order_index = -1
-
     new_order_index = max_order_index + 1
 
     document = {
@@ -142,12 +141,15 @@ async def create_virtual_tour_data(nama_virtual_path: str, description_area: str
 
     result = await collection_virtual_tour.insert_one(document)
 
-    return {
-        "_id": str(result.inserted_id),
-        "nama_virtual_path": nama_virtual_path,
-        "order_index": new_order_index,
-        "message": "Virtual tour created successfully with correct order_index"
-    }
+    # Kembalikan respons yang lebih lengkap, sama seperti di contoh pura-besakih
+    inserted_document = await collection_virtual_tour.find_one({"_id": result.inserted_id})
+    if inserted_document:
+        inserted_document["_id"] = str(inserted_document["_id"])
+        # Tambahkan pesan sukses jika perlu
+        # inserted_document["message"] = "Virtual tour created successfully"
+        return inserted_document
+    else:
+        raise HTTPException(status_code=404, detail="Gagal menemukan dokumen yang baru dibuat.")
 
 
 

@@ -821,12 +821,13 @@ async def get_virtual_tour_by_pura_id_data(pura_id: str):
 
 @app.post("/api/virtualtourdata/createvirtualtour")
 async def create_virtual_tour_data_endpoint(
+    # 1. Menerima data teks dan file, sama seperti contoh
     nama_virtual_path: str = Form(...),
     description_area: str = Form(...),
-    panorama: UploadFile = File(...),
-    thumbnail: UploadFile = File(...),
-    pura_id: str = Form(""),
-    current_user: UserInDB = Depends(get_current_user)
+    pura_id: str = Form(...),
+    panorama_file: UploadFile = File(...),  # Nama parameter sudah benar
+    thumbnail_file: UploadFile = File(...), # Nama parameter sudah benar
+    current_user: UserInDB = Depends(get_current_user) # Asumsi
 ):
     if not current_user:
         raise HTTPException(
@@ -835,36 +836,39 @@ async def create_virtual_tour_data_endpoint(
         )
 
     try:
-        # Upload panorama ke Cloudinary
+        # 2. Proses File Panorama, sama seperti contoh
         panorama_result = cloudinary.uploader.upload(
-            panorama.file,
-            folder="virtual-tour",
-            resource_type="auto"
+            panorama_file.file,
+            folder="virtual-tour"
         )
+        # 3. Dapat URL Panorama
         panorama_url = panorama_result.get("secure_url")
 
-        # Upload thumbnail ke Cloudinary
+        # 2. Proses File Thumbnail, sama seperti contoh
         thumbnail_result = cloudinary.uploader.upload(
-            thumbnail.file,
-            folder="virtual-tour-thumbnails",
-            resource_type="auto"
+            thumbnail_file.file,
+            folder="virtual-tour-thumbnails"
         )
+        # 3. Dapat URL Thumbnail
         thumbnail_url = thumbnail_result.get("secure_url")
+        
+        if not panorama_url or not thumbnail_url:
+            raise HTTPException(status_code=500, detail="Gagal mendapatkan URL salah satu gambar setelah upload.")
 
-        # Buat virtual tour di database (TANPA kirim order_index lagi)
+        # 4. Panggil fungsi internal dengan URL, sama seperti contoh
         response = await create_virtual_tour_data(
-            nama_virtual_path,
-            description_area,
-            panorama_url,
-            thumbnail_url,
-            pura_id
+            nama_virtual_path=nama_virtual_path,
+            description_area=description_area,
+            panorama_url=panorama_url,
+            thumbnail_url=thumbnail_url,
+            pura_id=pura_id
         )
         return response
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Gagal membuat virtual tour: {str(e)}"
+            detail=f"Terjadi kesalahan di server: {str(e)}"
         )
 
 @app.put("/api/virtualtourdata/updatevirtualtour/{id}")
