@@ -66,11 +66,11 @@ async def fetch_one_virtual_tour(id: str):
             "updatedDate": str(updateTanggal),
             "updateTime": str(updateWaktu)
         }
-
-        return {"data_virtual_tour": [virtual_tour_data]}
+        
+        return virtual_tour_data
     except Exception as e:
         print(f"Error fetching virtual tour: {e}")
-        return {"data_virtual_tour": [], "error": str(e)}
+        return None
     
 
 
