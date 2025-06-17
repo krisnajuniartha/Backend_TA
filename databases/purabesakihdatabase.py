@@ -258,32 +258,32 @@ async def create_pura_data(
 ):
     timestamps = time.time()
     
-    # Process hariraya_id to ensure it's a list of individual IDs
     processed_hariraya_ids = []
     
-    # If hariraya_id is provided as a single string with comma-separated values
     if isinstance(hariraya_id, list):
         for item in hariraya_id:
             if isinstance(item, str) and "," in item:
-                # Split comma-separated string into individual IDs
                 ids = [id.strip() for id in item.split(",")]
                 processed_hariraya_ids.extend(ids)
             else:
                 processed_hariraya_ids.append(item)
     elif isinstance(hariraya_id, str):
-        # If hariraya_id is a single string with comma-separated values
         if "," in hariraya_id:
             processed_hariraya_ids = [id.strip() for id in hariraya_id.split(",")]
         else:
             processed_hariraya_ids = [hariraya_id]
+            
+    # --- TAMBAHKAN BARIS INI ---
+    # Membersihkan setiap ID dari tanda kutip ganda yang tidak perlu
+    cleaned_hariraya_ids = [re.sub(r'^"|"$', '', str(id).strip()) for id in processed_hariraya_ids]
     
     document = {
         "nama_pura": nama_pura,
         "description": description,
-        "audio_description": audio_description,  # Ensure this accepts MP3 URLs
+        "audio_description": audio_description,
         "image_pura": image_pura,
         "status_id": status_id,
-        "hariraya_id": processed_hariraya_ids,  # Use the processed list
+        "hariraya_id": cleaned_hariraya_ids,  # Gunakan list yang sudah dibersihkan
         "golongan_id": golongan_id,
         "createdAt": timestamps,
         "updatedAt": timestamps
@@ -352,6 +352,18 @@ async def update_pura_data(
             update_data["image_pura"] = upload_result.get("secure_url")
             await image_file.close()
         
+        if hariraya_id is not None:
+        # Proses untuk memisahkan jika ada string dengan koma
+            processed_ids = []
+            for item in hariraya_id:
+                if isinstance(item, str) and "," in item:
+                    processed_ids.extend([i.strip() for i in item.split(",")])
+                else:
+                    processed_ids.append(item)
+
+            cleaned_hariraya_ids = [re.sub(r'^"|"$', '', str(id).strip()) for id in processed_ids]
+            update_data["hariraya_id"] = cleaned_hariraya_ids
+
         # Handle audio upload
         if audio_file and audio_file.filename:
             # Hapus audio lama jika ada
